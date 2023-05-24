@@ -1,10 +1,9 @@
 #include <iostream>
-#include <fstream>
 #include <string>
 #include <set>
 #include <algorithm>
 
-#include <windows.h>
+#include <windows.h> // only for Sleep()
 #include <filesystem>
 
 using namespace std::filesystem;
@@ -17,13 +16,17 @@ void deleteGarbage(const path& dir, std::set<path>& queue);
 
 /* Main program */
 int main(){
+
+    // Built-in user folders to ignore
+    std::set<std::string> ignore{"All Users", "Default", "Default User", "Public"};
+
+    // Program header output
     std::cout << "Raymond's Garbage Remover (5/24/2023 build)\n";
     // Gets the system drive letter
     directory_entry user_dir(std::string(getenv("SystemDrive")) + "\\Users");
     sanityCheck(user_dir);
-    // Set of built-in user folders to ignore
-    std::set<std::string> ignore{"All Users", "Default", "Default User", "Public"};
-    std::string command; std::set<path> possible_trash;
+    std::string command;
+    std::set<path> possible_trash;
     // Iterates through all user folders
     for (const auto& user_entry: directory_iterator(user_dir)){
         std::string user_name = user_entry.path().filename().string();
@@ -54,6 +57,8 @@ std::string lowerStr(const std::string& str){
     return result;
 }
 
+/* Given a directory_entry pointing to a directory, checks if it is valid and
+terminates the program if not. */
 void sanityCheck(const directory_entry& dir){
     if (!dir.exists()){
         std::cout << dir.path().filename() << " does not exist, aborting...\n";
@@ -62,12 +67,14 @@ void sanityCheck(const directory_entry& dir){
     }
 }
 
-/* Given a path pointing to a directory, iterates through all files within the
-directory along with all files within subdirectories. Detects whether each file
-is a possible garbage file and adds it to a set if so. Returns the set. */
+/* Given a path pointing to a directory and an empty set, iterates through all
+files within the directory along with all files within subdirectories. Detects
+whether each file is a possible garbage file and adds it to the set if so. */
 void detectGarbage(const path& dir, std::set<path>& queue){
+
     // Extensions used to detect possible trash
     std::set<std::string> key_extensions{".msi", ".exe", ".zip"};
+
     // Iterates through all files in the directory
     for (const auto& f_entry: recursive_directory_iterator(dir)){
         path f_path(f_entry);
@@ -77,6 +84,8 @@ void detectGarbage(const path& dir, std::set<path>& queue){
     }
 }
 
+/* Given a path pointing to a directory and a set filled with queried files,
+iterates through the set and prompts the user to review each file within. */
 void deleteGarbage(const path& dir, std::set<path>& queue){
     std::string command;
     if (queue.size() == 0){
