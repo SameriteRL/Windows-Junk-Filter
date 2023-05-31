@@ -14,7 +14,7 @@ namespace fs = std::filesystem;
 std::string lowerStr(const std::string& str);
 void sanityCheck(const fs::directory_entry& dir);
 std::pair<const double, const std::string> formatBytes(double bytes);
-template <typename TP> std::time_t to_time_t(TP tp);
+template <typename TP> std::time_t to_time_t(const TP tp);
 void detectGarbage(const fs::path& dir, std::set<fs::path>& queue);
 void reviewGarbage(const fs::path& dir, std::set<fs::path>& queue);
 
@@ -23,29 +23,34 @@ int main(){
 
     // Built-in user folders to ignore, might move to external file later
     std::set<std::string> ignore{"All Users", "Default", "Default User", "Public"};
+    // Subdirectories of a user folder to search within
+    std::set<std::string> only_scan{"3D Objects", "Desktop", "Documents", "Downloads",
+                                    "Music", "OneDrive", "Pictures", "Videos"};
 
     // Program header output
-    std::cout << "Raymond's Garbage Remover (5/24/2023 build)\n";
+    std::cout << "Raymond's Garbage Remover (5/30/2023 build)\n\n";
     // Gets the system drive letter
     fs::directory_entry user_dir(std::string(getenv("SystemDrive")) + "\\Users");
     sanityCheck(user_dir);
+
     std::string command;
     std::set<fs::path> possible_trash;
     // Iterates through all user folders
-    for (const auto& user_entry: fs::directory_iterator(user_dir)){
-        std::string user_name = user_entry.path().filename().string();
-        if (!user_entry.is_directory() || ignore.find(user_name) != ignore.end())
+    for (const auto& user: fs::directory_iterator(user_dir)){
+        std::string user_name = user.path().filename().string();
+        // Ignores non-folders and ones specified in "ignore"
+        if (!user.is_directory() || ignore.find(user_name) != ignore.end())
             continue;
-        fs::directory_entry downloads_dir(user_entry.path().string() + "\\Downloads");
-        // Quick sanity check
-        if (!fs::directory_entry(user_dir).exists()){
-            std::cout << downloads_dir.path().string() << " doesn't exist, skipping...\n";
-            continue;
+        // Iterates within each user folder
+        for (const auto& subdirectory: fs::directory_iterator(user)){
+            if (!subdirectory.is_directory() ||
+                only_scan.find(subdirectory.path().stem().string()) == only_scan.end())
+                continue;
+            // Scans each subdirectory for trash
+            detectGarbage(subdirectory, possible_trash);
+            // Displays all detected files and prompts the user to manage each one
+            reviewGarbage(subdirectory, possible_trash);
         }
-        // Scans the downloads folder for trash
-        detectGarbage(downloads_dir, possible_trash);
-        // Displays all detected files and prompts the user to manage each one
-        reviewGarbage(downloads_dir, possible_trash);
     }
     std::cout << "\nScan finished! Exiting shortly...\n";
     Sleep(5000);
@@ -94,7 +99,7 @@ std::pair<const double, const std::string> formatBytes(double bytes){
 from Stack Overflow because there's no easy way to convert from
 std::filesystem::file_time_type to time_t. */
 template <typename TP>
-std::time_t to_time_t(TP tp){
+std::time_t to_time_t(const TP tp){
     using namespace std::chrono;
     auto sctp = time_point_cast<system_clock::duration>
                 (tp - TP::clock::now() + system_clock::now());
@@ -112,18 +117,26 @@ void detectGarbage(const fs::path& dir, std::set<fs::path>& queue){
                                     "betterdiscord", "jdk", "jre"};
 
     // Iterates through all files in the directory
-    for (const auto& f_entry: fs::recursive_directory_iterator(dir)){
-        fs::path f_path(f_entry);
+    fs::recursive_directory_iterator itr(dir, fs::directory_options::skip_permission_denied), end;
+    while (itr != end){
+        fs::path f_path(*itr);
         std::string f_name = lowerStr(f_path.stem().string());
         std::string f_extension = f_path.extension().string();
         // Determines if the file is a possible junk file
-        if (key_extensions.find(f_extension) == key_extensions.end()) continue;
-        for (const auto& word: key_words){
-            if (f_name.find(word) != std::string::npos){
-                queue.insert(f_path);
-                break;
+        if (f_extension == ".msi"){
+            queue.insert(f_path);
+            itr++;
+            continue;
+        }
+        if (key_extensions.find(f_extension) != key_extensions.end()){
+            for (const auto& word: key_words){
+                if (f_name.find(word) != std::string::npos){
+                    queue.insert(f_path);
+                    break;
+                }
             }
         }
+        itr++;
     }
 }
 
@@ -132,10 +145,10 @@ iterates through the set and prompts the user to review each file within. */
 void reviewGarbage(const fs::path& dir, std::set<fs::path>& queue){
     std::string command;
     if (queue.size() == 0){
-        std::cout << "\nNo possible trash files detected.\n";
+        // std::cout << "No possible trash files detected.\n";
         return;
     }
-    std::cout << "\nPossible trash files detected (" << dir.string() << "):\n";
+    std::cout << "Possible trash files detected (" << dir.string() << "):\n";
     for (auto& file: queue) std::cout << file.filename().string() << std::endl;
     std::set<fs::path>::iterator i = queue.begin();
     while (i != queue.end()){
@@ -147,11 +160,11 @@ void reviewGarbage(const fs::path& dir, std::set<fs::path>& queue){
         // Gets the file's size as a readable string
         std::pair<const double, const std::string> size = formatBytes(file_size(*i));
         // Prints the file info and a deletion prompt
-        std::cout << std::endl << std::string(30, '-') << std::endl
+        std::cout << std::endl << std::string(36, '-') << std::endl
                   << i -> filename().string() << "\nSize: " << std::fixed
                   << std::setprecision(1) << size.first << ' ' << size.second
                   << std::endl << "Last write: " << buff << std::endl
-                  << std::string(30, '-') << "\n\nDelete file? (y/n) ";
+                  << std::string(36, '-') << "\n\nDelete file? (y/n) ";
         // Handles yes/no response
         std::cin >> command;
         if (lowerStr(command) == "y"){
