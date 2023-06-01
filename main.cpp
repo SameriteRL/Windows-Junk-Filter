@@ -1,5 +1,6 @@
 #include <iostream>
 #include <iomanip>
+#include <fstream>
 #include <string>
 #include <set>
 #include <algorithm>
@@ -9,26 +10,27 @@
 #include <filesystem>
 
 namespace fs = std::filesystem;
+using strSet = std::set<std::string>;
 
 // Forward declarations
+void readFile(const std::string& fileName, strSet& ignored_users, strSet& only_scan,
+              strSet& key_extensions, strSet& key_words);
 std::string lowerStr(const std::string& str);
 void sanityCheck(const fs::directory_entry& dir);
 std::pair<const double, const std::string> formatBytes(double bytes);
 template <typename TP> std::time_t to_time_t(const TP tp);
-void detectGarbage(const fs::path& dir, std::set<fs::path>& queue);
+void detectGarbage(const fs::path& dir, std::set<fs::path>& queue,
+                   const strSet& key_extensions, const strSet& key_words);
 void reviewGarbage(const fs::path& dir, std::set<fs::path>& queue);
 
 /* Main program */
 int main(){
-
-    // Built-in user folders to ignore, might move to external file later
-    std::set<std::string> ignore{"All Users", "Default", "Default User", "Public"};
-    // Subdirectories of a user folder to search within
-    std::set<std::string> only_scan{"3D Objects", "Desktop", "Documents", "Downloads",
-                                    "Music", "OneDrive", "Pictures", "Videos"};
+    
+    strSet ignored_users, only_scan, key_extensions, key_words;
+    readFile("data.txt", ignored_users, only_scan, key_extensions, key_words);
 
     // Program header output
-    std::cout << "Raymond's Garbage Remover (5/30/2023 build)\n\n";
+    std::cout << "Raymond's Garbage Remover (6/1/2023 build)\n";
     // Gets the system drive letter
     fs::directory_entry user_dir(std::string(getenv("SystemDrive")) + "\\Users");
     sanityCheck(user_dir);
@@ -36,33 +38,76 @@ int main(){
     std::string command;
     std::set<fs::path> possible_trash;
     // Iterates through all user folders
-    for (const auto& user: fs::directory_iterator(user_dir)){
-        std::string user_name = user.path().filename().string();
-        // Ignores non-folders and ones specified in "ignore"
-        if (!user.is_directory() || ignore.find(user_name) != ignore.end())
+    fs::directory_iterator itr(user_dir), end;
+    while (itr != end){
+        std::string user_name = lowerStr(itr -> path().stem().string());
+        // Ignores non-folders and specified folders to ignore
+        if (!itr -> is_directory() || ignored_users.find(user_name) != ignored_users.end()){
+            itr++;
             continue;
-        // Iterates within each user folder
-        for (const auto& subdirectory: fs::directory_iterator(user)){
-            if (!subdirectory.is_directory() ||
-                only_scan.find(subdirectory.path().stem().string()) == only_scan.end())
-                continue;
-            // Scans each subdirectory for trash
-            detectGarbage(subdirectory, possible_trash);
-            // Displays all detected files and prompts the user to manage each one
-            reviewGarbage(subdirectory, possible_trash);
         }
+        // Iterates within each user folder
+        fs::directory_iterator subdir_itr(*itr), subdir_end;
+        while (subdir_itr != subdir_end){
+            std::string subdir_name = lowerStr(subdir_itr -> path().stem().string());
+            if (!subdir_itr -> is_directory() || only_scan.find(subdir_name) == only_scan.end()){
+                subdir_itr++;
+                continue;
+            }
+            // Scans each subdirectory for trash
+            detectGarbage(*subdir_itr, possible_trash, key_extensions, key_words);
+            // Displays all detected files and prompts the user to manage each one
+            reviewGarbage(*subdir_itr, possible_trash);
+            subdir_itr++;
+        }
+        itr++;
     }
     std::cout << "\nScan finished! Exiting shortly...\n";
     Sleep(5000);
     return 0;
 }
 
+/* Given a string file name and several string sets, reads the file and appropriately
+fills each set with the content in the file. */
+void readFile(const std::string& fileName, strSet& ignored_users, strSet& only_scan,
+              strSet& key_extensions, strSet& key_words){
+    std::ifstream in_str(fileName);
+    if (!in_str.good()){
+        std::cerr << "Could not open " << fileName << " for reading! Aborting...\n";
+        Sleep(5000);
+        exit(1);
+    }
+    std::string command, arg;
+    while (in_str >> command >> arg){
+        if (command == "i") ignored_users.insert(arg);
+        else if (command == "s") only_scan.insert(arg);
+        else if (command == "e") key_extensions.insert(arg);
+        else if (command == "w") key_words.insert(arg);
+        else{
+            std::cerr << "Error parsing data file! Aborting...\n";
+            Sleep(5000);
+            exit(1);
+        }
+    }
+}
+
 /* Given a string, returns a copy of the string with all uppercase letters turned
 lowercase, retaining any non-letters. */
 std::string lowerStr(const std::string& str){
     std::string result = str;
-    for (auto& c: result){
-        c = tolower(c);
+    std::string::iterator itr = result.begin();
+    while (itr != result.end()){
+        if (isdigit(*itr)){
+            itr++;
+            continue;
+        }
+        if (isalpha(*itr)){
+            *itr = tolower(*itr);
+            itr++;
+        }
+        else{
+            itr = result.erase(itr);
+        }
     }
     return result;
 }
@@ -109,15 +154,10 @@ std::time_t to_time_t(const TP tp){
 /* Given a path pointing to a directory and an empty set, iterates through all
 files within the directory along with all files within subdirectories. Detects
 whether each file is a possible garbage file and adds it to the set if so. */
-void detectGarbage(const fs::path& dir, std::set<fs::path>& queue){
-
-    // Extensions/words used to detect possible trash
-    std::set<std::string> key_extensions{".msi", ".exe", ".jar", ".zip"};
-    std::set<std::string> key_words{"setup", "install", "wizard",
-                                    "betterdiscord", "jdk", "jre"};
-
+void detectGarbage(const fs::path& dir, std::set<fs::path>& queue,
+                   const strSet& key_extensions, const strSet& key_words){
     // Iterates through all files in the directory
-    fs::recursive_directory_iterator itr(dir, fs::directory_options::skip_permission_denied), end;
+    fs::directory_iterator itr(dir, fs::directory_options::skip_permission_denied), end;
     while (itr != end){
         fs::path f_path(*itr);
         std::string f_name = lowerStr(f_path.stem().string());
@@ -148,7 +188,7 @@ void reviewGarbage(const fs::path& dir, std::set<fs::path>& queue){
         // std::cout << "No possible trash files detected.\n";
         return;
     }
-    std::cout << "Possible trash files detected (" << dir.string() << "):\n";
+    std::cout << "\nPossible trash files detected (" << dir.string() << "):\n";
     for (auto& file: queue) std::cout << file.filename().string() << std::endl;
     std::set<fs::path>::iterator i = queue.begin();
     while (i != queue.end()){

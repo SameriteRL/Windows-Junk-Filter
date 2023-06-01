@@ -1,0 +1,26 @@
+i allusers
+i default
+i defaultuser
+i public
+
+s 3dobjects
+s desktop
+s documents
+s downloads
+s dropbox
+s music
+s onedrive
+s pictures
+s videos
+
+e .msi
+e .exe
+e .jar
+e .zip
+
+w setup
+w install
+w wizard
+w betterdiscord
+w jdk
+w jre
