@@ -9,16 +9,16 @@
 #include <windows.h> // only for Sleep()
 #include <filesystem>
 
+#include "utility.h"
+
 namespace fs = std::filesystem;
 using strSet = std::set<std::string>;
 
 // Forward declarations
 void readFile(const std::string& fileName, strSet& ignored_users, strSet& only_scan,
               strSet& key_extensions, strSet& key_words);
-std::string lowerStr(const std::string& str);
 void sanityCheck(const fs::directory_entry& dir);
 std::pair<const double, const std::string> formatBytes(double bytes);
-template <typename TP> std::time_t to_time_t(const TP tp);
 void detectGarbage(const fs::path& dir, std::set<fs::path>& queue,
                    const strSet& key_extensions, const strSet& key_words);
 void reviewGarbage(const fs::path& dir, std::set<fs::path>& queue);
@@ -91,27 +91,6 @@ void readFile(const std::string& fileName, strSet& ignored_users, strSet& only_s
     }
 }
 
-/* Given a string, returns a copy of the string with all uppercase letters turned
-lowercase, retaining any non-letters. */
-std::string lowerStr(const std::string& str){
-    std::string result = str;
-    std::string::iterator itr = result.begin();
-    while (itr != result.end()){
-        if (isdigit(*itr)){
-            itr++;
-            continue;
-        }
-        if (isalpha(*itr)){
-            *itr = tolower(*itr);
-            itr++;
-        }
-        else{
-            itr = result.erase(itr);
-        }
-    }
-    return result;
-}
-
 /* Given a directory_entry pointing to a directory, checks if it is valid and
 terminates the program if not. */
 void sanityCheck(const fs::directory_entry& dir){
@@ -138,17 +117,6 @@ std::pair<const double, const std::string> formatBytes(double bytes){
         return std::make_pair(bytes / 1024, "KB");
     }
     return std::make_pair(bytes, "bytes");
-}
-
-/* Takes in a type that has all elements of TrivialClock implemented. Copied
-from Stack Overflow because there's no easy way to convert from
-std::filesystem::file_time_type to time_t. */
-template <typename TP>
-std::time_t to_time_t(const TP tp){
-    using namespace std::chrono;
-    auto sctp = time_point_cast<system_clock::duration>
-                (tp - TP::clock::now() + system_clock::now());
-    return system_clock::to_time_t(sctp);
 }
 
 /* Given a path pointing to a directory and an empty set, iterates through all
