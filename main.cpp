@@ -29,28 +29,26 @@ int main(){
     strSet ignored_users, only_scan, key_extensions, key_words;
     readFile("data.txt", ignored_users, only_scan, key_extensions, key_words);
 
-    // Program header output
-    std::cout << "Raymond's Garbage Remover (6/1/2023 build)\n";
-    // Gets the system drive letter
+    std::cout << "Garbage File Remover Utility for Windows - 6/24/2023 Build"
+              << "\nBy Raymond Chen" << std::endl;
     fs::directory_entry user_dir(std::string(getenv("SystemDrive")) + "\\Users");
     sanityCheck(user_dir);
 
-    std::string command;
     std::set<fs::path> possible_trash;
     // Iterates through all user folders
     fs::directory_iterator itr(user_dir), end;
     while (itr != end){
-        std::string user_name = lowerStr(itr -> path().stem().string());
-        // Ignores non-folders and specified folders to ignore
-        if (!itr -> is_directory() || ignored_users.find(user_name) != ignored_users.end()){
+        std::string user_lowname = lowerStr(itr -> path().stem().string());
+        // Ignores non-folders and specified folders in ignored_users
+        if (!itr -> is_directory() || ignored_users.find(user_lowname) != ignored_users.end()){
             itr++;
             continue;
         }
-        // Iterates within each user folder
+        // Iterates through the contents of each user folder
         fs::directory_iterator subdir_itr(*itr), subdir_end;
         while (subdir_itr != subdir_end){
-            std::string subdir_name = lowerStr(subdir_itr -> path().stem().string());
-            if (!subdir_itr -> is_directory() || only_scan.find(subdir_name) == only_scan.end()){
+            std::string subdir_lowname = lowerStr(subdir_itr -> path().stem().string());
+            if (!subdir_itr -> is_directory() || only_scan.find(subdir_lowname) == only_scan.end()){
                 subdir_itr++;
                 continue;
             }
@@ -128,7 +126,7 @@ void detectGarbage(const fs::path& dir, std::set<fs::path>& queue,
     fs::directory_iterator itr(dir, fs::directory_options::skip_permission_denied), end;
     while (itr != end){
         fs::path f_path(*itr);
-        std::string f_name = lowerStr(f_path.stem().string());
+        std::string f_lowname = lowerStr(f_path.stem().string());
         std::string f_extension = f_path.extension().string();
         // Determines if the file is a possible junk file
         if (f_extension == ".msi"){
@@ -138,7 +136,7 @@ void detectGarbage(const fs::path& dir, std::set<fs::path>& queue,
         }
         if (key_extensions.find(f_extension) != key_extensions.end()){
             for (const auto& word: key_words){
-                if (f_name.find(word) != std::string::npos){
+                if (f_lowname.find(word) != std::string::npos){
                     queue.insert(f_path);
                     break;
                 }
@@ -149,15 +147,14 @@ void detectGarbage(const fs::path& dir, std::set<fs::path>& queue,
 }
 
 /* Given a path pointing to a directory and a set filled with queried files,
-iterates through the set and prompts the user to review each file within. */
+iterates through the set and prompts the user to review each file. */
 void reviewGarbage(const fs::path& dir, std::set<fs::path>& queue){
     std::string command;
-    if (queue.size() == 0){
-        // std::cout << "No possible trash files detected.\n";
-        return;
-    }
+    if (queue.size() == 0) return;
     std::cout << "\nPossible trash files detected (" << dir.string() << "):\n";
-    for (auto& file: queue) std::cout << file.filename().string() << std::endl;
+    for (auto& file: queue){
+        std::cout << file.filename().string() << std::endl;
+    }
     std::set<fs::path>::iterator i = queue.begin();
     while (i != queue.end()){
         // Gets the file's last write time as a readable string
@@ -167,13 +164,12 @@ void reviewGarbage(const fs::path& dir, std::set<fs::path>& queue){
         strftime(buff, 32, "%m/%d/%Y at %H:%M:%S", raw_time_tm);
         // Gets the file's size as a readable string
         std::pair<const double, const std::string> size = formatBytes(file_size(*i));
-        // Prints the file info and a deletion prompt
+        // Prints the file info and a prompt asking whether to delete the file
         std::cout << std::endl << std::string(36, '-') << std::endl
                   << i -> filename().string() << "\nSize: " << std::fixed
                   << std::setprecision(1) << size.first << ' ' << size.second
                   << std::endl << "Last write: " << buff << std::endl
                   << std::string(36, '-') << "\n\nDelete file? (y/n) ";
-        // Handles yes/no response
         std::cin >> command;
         if (lowerStr(command) == "y"){
             remove(*i);

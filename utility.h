@@ -13,16 +13,14 @@ std::string lowerStr(const std::string& str){
     std::string result = str;
     std::string::iterator itr = result.begin();
     while (itr != result.end()){
-        if (isdigit(*itr)){
-            itr++;
-            continue;
-        }
-        if (isalpha(*itr)){
-            *itr = tolower(*itr);
-            itr++;
+        if (!isdigit(*itr) && !isalpha(*itr)){
+            itr = result.erase(itr);
         }
         else{
-            itr = result.erase(itr);
+            if (isalpha(*itr)){
+                *itr = tolower(*itr);
+            }
+            itr++;
         }
     }
     return result;
