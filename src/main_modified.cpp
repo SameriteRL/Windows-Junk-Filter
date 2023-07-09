@@ -50,7 +50,8 @@ int main(){
             }
             // Scans each subdirectory for trash
             detectGarbage(*subdir_itr, possible_trash, key_extensions, key_words);
-            for (auto& query: possible_trash) std::cout << query.string() << std::endl;
+            for (auto& query: possible_trash)
+                std::cout << query.string() << std::endl;
             possible_trash.clear();
             subdir_itr++;
         }
@@ -87,7 +88,7 @@ void readFile(const std::string& fileName, strSet& ignored_users, strSet& only_s
 terminates the program if not. */
 void sanityCheck(const fs::directory_entry& dir){
     if (!dir.exists()){
-        std::cout << dir.path().filename() << " does not exist, aborting...\n";
+        std::cerr << dir.path().filename() << " does not exist, aborting...\n";
         Sleep(5000);
         exit(1);
     }
