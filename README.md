@@ -2,9 +2,9 @@
 
 A basic tool to assist in removing any forgotten or leftover installer files from (almost) anywhere in your system.
 
-![Example Image](assets/sample_program.png)
+![Example Screenshot](assets/example_screenshot.png)
 
-On a lesser note, this project is mostly a personal learning adventure in combining multiple programming languages and making a GUI using Python's standard Tkinter library.
+On a side note, this project is mainly meant to help me learn how to do a bunch of different things: using multiple programming languages in collaboration, managing the Windows file system using code, and creating GUI using Python's standard, general-use Tkinter library.
 
 ## Build Dependencies
 **Python (3.0+)**
