@@ -1,10 +1,31 @@
+"""
+Garbage Removeinator
+By Raymond Chen
+
+The purpose of this program is to scan for and assist in the deletion of any possible
+leftover installer files, each of which have likely been used to install a program and now
+serves no purpose. By displaying these installers' paths together in one window, this
+program eliminates the hassle of manually searching the File Explorer for clutter and
+offers a powerful, easy-to-use interface for removing them in just a few clicks.
+"""
+
+import sys
 import os
 import subprocess
-import customTk
 from tkinter import *
 from tkinter import ttk
 from tkinter import messagebox
-from argparse import ArgumentParser
+import customTk
+
+# When running a one-file build, any resource files used by the program are unpacked
+# into a temp directory referenced by sys._MEIPASS. This function is necessary to
+# translate paths used during development into paths usable by the build.
+def getResourcePath(rel_path:str) -> str:
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, rel_path)
 
 class GarbageRemovalUtilityUI(ttk.Frame):
     def __init__(self, parent:Widget, scancommand:str, padding:int=15):
@@ -15,7 +36,7 @@ class GarbageRemovalUtilityUI(ttk.Frame):
         self.rowconfigure(1, weight=1)
 
         ### MAIN FRAME ###
-        self.label = ttk.Label(self, text="Select the file(s) you want to delete below")
+        self.label = ttk.Label(self, text="Select the file(s) you want to delete below:")
         self.label.grid(column=0, row=0, sticky=W)
 
         ### PATHS FRAME ###
@@ -87,7 +108,7 @@ class GarbageRemovalUtilityUI(ttk.Frame):
         if cmd == None: cmd = self.scan_cmd
         try:
             completed_process = subprocess.run(
-                [cmd],
+                [getResourcePath(cmd)],
                 timeout=10,
                 check=True,
                 capture_output=True, 
@@ -98,8 +119,8 @@ class GarbageRemovalUtilityUI(ttk.Frame):
                 path_set = completed_process.stdout.strip("\n").split("\n")
                 return path_set
             return list()
-        except TimeoutError:
-            print("ERROR: Subprocess timed out!")
+        except Exception as err:
+            print(err)
         return ["ERROR"]
     
     def deleteHandler(self, *args) -> None:
@@ -131,14 +152,7 @@ class GarbageRemovalUtilityUI(ttk.Frame):
             )
 
 if __name__ == "__main__":
-    parser = ArgumentParser()
-    parser.add_argument(
-        "-c", "--command",
-        help="the command to run",
-    )
-    args = parser.parse_args()
-    run_cmd = args.command if args.command != None else "./scanGarbage.exe"
-
+    run_cmd = ".\scanutil.exe"
     root = customTk.TkWindow(
         title="Garbage Removeinator",
         geometry="500x275",
