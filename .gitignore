@@ -1,4 +1,7 @@
 
 .vscode
+build
+dist
+*.spec
 *.exe
 *.pyc
