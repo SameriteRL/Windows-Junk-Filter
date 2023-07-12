@@ -1,3 +1,5 @@
+// g++ ./scanutil.cpp ./utility.cpp -o scanutil.exe -mwindows -g -Wall -Wextra
+
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -6,7 +8,6 @@
 #include <algorithm>
 
 #include <chrono>
-#include <windows.h> // only for Sleep()
 #include <filesystem>
 
 #include "utility.h"
@@ -14,29 +15,31 @@
 namespace fs = std::filesystem;
 using strSet = std::set<std::string>;
 
-// Forward declarations
-void readFile(const std::string& fileName, strSet& ignored_users, strSet& only_scan,
-              strSet& key_extensions, strSet& key_words);
-void sanityCheck(const fs::directory_entry& dir);
+// =======================================================================================
+void readData(strSet& ignored_users, strSet& only_scan, strSet& key_extensions,
+               strSet& key_words);
 void detectGarbage(const fs::path& dir, std::set<fs::path>& queue,
                    const strSet& key_extensions, const strSet& key_words);
+// =======================================================================================
 
-/* Main program */
 int main(){
-    
+    // Data reading should be done by input redirection
     strSet ignored_users, only_scan, key_extensions, key_words;
-    readFile("data.txt", ignored_users, only_scan, key_extensions, key_words);
-
+    readData(ignored_users, only_scan, key_extensions, key_words);
+    // Quick sanity check
     fs::directory_entry user_dir(std::string(getenv("SystemDrive")) + "\\Users");
-    sanityCheck(user_dir);
-
+    if (!user_dir.exists()){
+        std::cerr << user_dir.path().filename() << " does not exist!";
+        exit(1);
+    }
     std::set<fs::path> possible_trash;
     // Iterates through all user folders
     fs::directory_iterator itr(user_dir), end;
     while (itr != end){
         std::string user_lowname = lowerStr(itr -> path().stem().string());
         // Ignores non-folders and specified folders in ignored_users
-        if (!itr -> is_directory() || ignored_users.find(user_lowname) != ignored_users.end()){
+        if (!itr -> is_directory() ||
+            ignored_users.find(user_lowname) != ignored_users.end()){
             itr++;
             continue;
         }
@@ -44,7 +47,8 @@ int main(){
         fs::directory_iterator subdir_itr(*itr), subdir_end;
         while (subdir_itr != subdir_end){
             std::string subdir_lowname = lowerStr(subdir_itr -> path().stem().string());
-            if (!subdir_itr -> is_directory() || only_scan.find(subdir_lowname) == only_scan.end()){
+            if (!subdir_itr -> is_directory() ||
+                only_scan.find(subdir_lowname) == only_scan.end()){
                 subdir_itr++;
                 continue;
             }
@@ -60,43 +64,21 @@ int main(){
     return 0;
 }
 
-/* Given a string file name and several string sets, reads the file and appropriately
-fills each set with the content in the file. */
-void readFile(const std::string& fileName, strSet& ignored_users, strSet& only_scan,
-              strSet& key_extensions, strSet& key_words){
-    std::ifstream in_str(fileName);
-    if (!in_str.good()){
-        std::cerr << "Could not open " << fileName << " for reading! Aborting...\n";
-        Sleep(5000);
-        exit(1);
-    }
+void readData(strSet& ignored_users, strSet& only_scan, strSet& key_extensions,
+               strSet& key_words){
     std::string command, arg;
-    while (in_str >> command >> arg){
+    while (std::cin >> command >> arg){
         if (command == "i") ignored_users.insert(arg);
         else if (command == "s") only_scan.insert(arg);
         else if (command == "e") key_extensions.insert(arg);
         else if (command == "w") key_words.insert(arg);
-        else{
-            std::cerr << "Error parsing data file! Aborting...\n";
-            Sleep(5000);
+        else {
+            std::cerr << "Error parsing data file!";
             exit(1);
         }
     }
 }
 
-/* Given a directory_entry pointing to a directory, checks if it is valid and
-terminates the program if not. */
-void sanityCheck(const fs::directory_entry& dir){
-    if (!dir.exists()){
-        std::cerr << dir.path().filename() << " does not exist, aborting...\n";
-        Sleep(5000);
-        exit(1);
-    }
-}
-
-/* Given a path pointing to a directory and an empty set, iterates through all
-files within the directory along with all files within subdirectories. Detects
-whether each file is a possible garbage file and adds it to the set if so. */
 void detectGarbage(const fs::path& dir, std::set<fs::path>& queue,
                    const strSet& key_extensions, const strSet& key_words){
     // Iterates through all files in the directory
