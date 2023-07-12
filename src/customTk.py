@@ -1,5 +1,5 @@
 """
-Module of custom, general-use Tk classes.
+Module of custom, general-use Tk classes. Intended for use in any Tk-based project.
 By Raymond Chen
 """
 
@@ -13,7 +13,7 @@ class TkWindow(Tk):
         self.title(title)
 
         # If custom window coordinates are specified in geometry, centerscreen is ignored
-        if centerscreen and not geometry.count("+"):
+        if centerscreen and geometry.count("+") == 0:
             dimensions = [int(dim) for dim in geometry.split("x")]
             geometry += f"+{self.winfo_screenwidth() // 2 - dimensions[0] // 2}" + \
                         f"+{self.winfo_screenheight() // 2 - dimensions[1] // 2}"
@@ -45,7 +45,7 @@ class TkWindow(Tk):
             self.printHierarchy(widget, depth + 1)
 
 class MultiSelectListbox(Listbox):
-    def __init__(self, parent:Widget, listvar:list, height:int=10):
+    def __init__(self, parent:Widget, listvar:list=[], height:int=10):
         self.stringvar = StringVar(value=listvar)
         super().__init__(
             parent,
@@ -56,17 +56,12 @@ class MultiSelectListbox(Listbox):
         self.content_list = listvar
         self.last_selected = ()
         self.bind("<<ListboxSelect>>", self.multiSelectHandler)
-
         # Colors the background of alternating items
         for i in range(0, len(self.content_list), 2):
             self.itemconfigure(i, background='#F0F0FF')
 
     def getContent(self) -> list:
         return self.content_list
-    
-    # Syncs the Listbox (on-screen) content to match the member list variable
-    def syncListbox(self) -> None:
-        self.stringvar.set(self.content_list)
 
     def setContent(self, content_list:list) -> None:
         self.content_list = content_list
@@ -94,3 +89,11 @@ class MultiSelectListbox(Listbox):
     def deselectAll(self) -> None:
         self.selection_clear(0, len(self.content_list))
         self.last_selected = ()
+    
+    # Syncs the Listbox (on-screen) content to match the member list variable, not
+    # meant to be called outside of this class
+    def syncListbox(self) -> None:
+        self.stringvar.set(self.content_list)
+        # Recolors the content backgrounds after changing the content list
+        for i in range(0, len(self.content_list), 2):
+            self.itemconfigure(i, background='#F0F0FF')
