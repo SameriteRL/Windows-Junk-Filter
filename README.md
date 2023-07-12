@@ -8,7 +8,8 @@ On a side note, this project is meant to help me learn how to do a bunch of diff
 - Using multiple programming languages in collaboration
 - Traversing and managing Windows files using code
 - Creating GUI using Python's standard Tkinter library
-- Compiling different types of files into binary ready for distribution
+- Compiling different file types together into single binaries
+- Exploring various GitHub tools
 
 ## Build Dependencies
 **Python (3.7+)**
